@@ -4,11 +4,11 @@ import requests
 url = "URL_OF_FMC"
 
 ### Group file format must be NAME;DESC
-group_file = open("groups_desc.csv", "r")
+group_file = open("groups_with_desc.csv", "r")
 
 ### Member file format must be PARENT_GROUP_NAME;NAME;ID;TYPE
-# If a member is in two groups, create two entries
-member_file = open("portgroups_to_import.txt", "r")
+# If a member belongs in two groups, create two separate entries in the file
+member_file = open("portgroups_to_import.csv", "r")
 
 ### Initialize arrays to stock group and members from files
 group_list = []
