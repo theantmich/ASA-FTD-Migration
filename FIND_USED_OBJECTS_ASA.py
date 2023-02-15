@@ -1,5 +1,7 @@
 from ciscoconfparse import CiscoConfParse
 import re
+import socket
+import struct
 
 objects = []
 net_groups = []
@@ -16,8 +18,14 @@ used_svc_groups = []
 unused_svc_groups = []
 
 
-def cidr(netmask):
+def to_cidr(netmask):
     return sum(bin(int(x)).count('1') for x in netmask.split('.'))
+
+def to_netmask(cidr):
+    host_bits = 32 - int(cidr)
+    netmask = socket.inet_ntoa(struct.pack('!I', (1 << 32) - (1 << host_bits)))
+    return netmask
+
 
 def find_objects():
 
@@ -33,7 +41,7 @@ def find_objects():
 
                     name = line[14:].strip()
                     ipv4 = nextLine[8:mask_start-1]
-                    mask = cidr(nextLine[mask_start:])
+                    mask = to_cidr(nextLine[mask_start:])
 
                     obj = {"name": name, "ipv4": ipv4, "mask" : mask}
 
@@ -108,7 +116,7 @@ def find_services():
             elif not line:
                 
                 break
-        print(services)
+        #print(services)
     return
 
 def find_object_groups():
@@ -139,8 +147,8 @@ def find_object_groups():
                 mask_start = child.find(' ')
 
                 ipv4 = child[:mask_start]
-                mask = cidr(child[mask_start:])
-                name = "OBJ_"+ child[:mask_start]+"_"+str(mask)
+                mask = to_cidr(child[mask_start:])
+                name = "INLINE_"+ child[:mask_start]+"_"+str(mask)
 
                 obj = {"name": name, "ipv4": ipv4, "mask" : mask}
 
@@ -173,7 +181,7 @@ def find_service_groups():
 
     for svc in all_svc_grps:
         search = (str(svc)[19:-2])
-        print(parse.find_children(search))
+        #print(parse.find_children(search))
         result = parse.find_children(search)
 
         groupName = result[0][21:]
@@ -276,53 +284,75 @@ def find_service_groups():
     #print(net_groups)
     return
 
+def is_grp_used():
+    for group in net_groups:
+        parse = CiscoConfParse("../show_run.txt")
+        hits = parse.find_objects(group['name'])     
+        
+        false_hits = str(hits).split(" ").count("'object") + str(hits).split(" ").count("'object-group") + str(hits).split(" ").count("' network-object")
+        
+        objExists = len(hits) - false_hits
+
+        if objExists > 0:
+            used_obj_groups.append(group)
+
+        else:
+            unused_obj_groups.append(group)
+
+    for group in svc_groups:
+        parse = CiscoConfParse("../show_run.txt")
+        hits = parse.find_objects(group['name'])        
+        
+        false_hits = str(hits).split(" ").count("'object") + str(hits).split(" ").count("'object-group") + str(hits).split(" ").count("' service-object")
+        
+        objExists = len(hits) - false_hits
+
+
+        if objExists > 0:
+            used_svc_groups.append(group)
+        else:
+            unused_svc_groups.append(group)
+
+    return
+
 def is_obj_used():
+    #Check if object is in used group
     for obj in objects:
-        parse = CiscoConfParse("../show_run.txt")
-        hits = parse.find_objects(obj['name'])        
-        
-        objExists = len(hits)
+        for group in used_obj_groups:
+            count = group['children'].count(obj['name'])
 
-        if objExists > 1:
-            used_objects.append(obj)
-        else:
-            unused_objects.append(obj)
+            if count > 0:
 
+                objInList = used_objects.count(obj)
+                if objInList > 0:
+                    pass
+                else:
+                    used_objects.append(obj)
+                #Otherwise, check if object is in unused groups
+            else:
+                #print(obj)
+                #print(unused_obj_groups)
+                for ugroup in unused_obj_groups:
+                    known_appearances = ugroup['children'].count(obj['name']) + 1 + count
+                    #print(known_appearances, obj)
 
-    for child in net_groups:
-        parse = CiscoConfParse("../show_run.txt")
-        hits = parse.find_objects(child['name'])        
-        
-        objExists = len(hits)
+                    parse = CiscoConfParse("../show_run.txt")
+                    hits = parse.find_objects(obj['name'])
+                    
+                    if len(hits) > known_appearances:
+                        objInList = used_objects.count(obj)
+                        if objInList > 0:
+                            pass
+                        else:
+                            used_objects.append(obj)
+                    else:
+                        objInList = unused_objects.count(obj)
+                        if objInList > 0:
+                            pass
+                        else:
+                            unused_objects.append(obj)
 
-        if objExists > 1:
-            used_obj_groups.append(child)
-        else:
-            unused_obj_groups.append(child)
-
-    for svc in services:
-        parse = CiscoConfParse("../show_run.txt")
-        hits = parse.find_objects(svc['name'])        
-        
-        objExists = len(hits)
-
-        if objExists > 1:
-            used_services.append(obj)
-        else:
-            unused_services.append(obj)
-
-
-    for child in svc_groups:
-        parse = CiscoConfParse("../show_run.txt")
-        hits = parse.find_objects(child['name'])        
-        
-        objExists = len(hits)
-
-        if objExists > 1:
-            used_svc_groups.append(child)
-        else:
-            unused_svc_groups.append(child)
-
+                    #print(hits, obj)
 
     return
 
@@ -330,6 +360,8 @@ find_objects()
 find_services()
 find_object_groups()
 find_service_groups()
+
+is_grp_used()
 is_obj_used()
 
 #print(objects)
@@ -337,5 +369,10 @@ is_obj_used()
 #print(services)
 #print(svc_groups)
 
+print(used_obj_groups)
+print("################################")
+print(unused_obj_groups)
+
 print(used_objects)
+print("################################")
 print(unused_objects)
