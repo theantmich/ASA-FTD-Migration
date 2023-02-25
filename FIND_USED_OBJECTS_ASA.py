@@ -2,6 +2,8 @@ from ciscoconfparse import CiscoConfParse
 import re
 import socket
 import struct
+import requests
+import json
 
 objects = []
 net_groups = []
@@ -397,53 +399,111 @@ def is_svc_used():
                     appendIfAbsent(svc,unused_services)
     return
 
+def create_object_api(obj):
+
+    url = "https://1.2.3.4/api/fdm/v6/object/networks?expanded=true&limit=9000"
+
+    if "INLINE_" in obj['name']:
+        name = obj['name'][7:]
+        print(name)
+    else:
+        name = obj['name']
+
+    if str(obj['mask']) == "32":
+        subtype = "HOST"
+        value = obj['ipv4']
+        name  = "HOST_"+name
+    else:
+        subtype = "NETWORK"
+        value = obj['ipv4']+"/"+str(obj['mask']).strip()
+        name  = "NET_"+name
+
+    payload = json.dumps({
+    "name": name,
+    "subType": subtype,
+    "value": value,
+    "type": "networkobject"
+    })
+
+    print(payload)
+    headers = {
+    'X-auth-access-token': '{{token}}',
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'Authorization': 'Bearer {{token}}'
+    }
+
+    response = requests.request("POST", url, headers=headers, data=payload, verify=False)
+
+    print(response.text)
+
+    return
+
+def create_object_group_api(grp):
+
+    payload = {
+    "name": "IPv4-Private-All-RFC1918",
+    "objects": [],
+    "type": "networkobjectgroup"
+    }
+    return
+
 find_objects()
 find_services()
 find_object_groups()
 find_service_groups()
 
-is_grp_used()
-is_obj_used()
-is_svc_used()
+#is_grp_used()
+#is_obj_used()
+#is_svc_used()
+for object in objects:
+    create_object_api(object)
+    print(object)
 
-print("############## USED OBJECT GROUPS ##################")
-print(used_obj_groups)
-print("#######################################################")
-print("Groupes d'objets utilisés :", len(used_obj_groups))
-print("############## UNUSED OBJECT GROUPS ##################")
-print(unused_obj_groups)
-print("#######################################################")
-print("Groupes d'objets inutilisés :", len(unused_obj_groups))
-print("Groupes d'objets totaux :", len(net_groups))
+for group in net_groups:
+    create_object_group_api(group)
+    print(group)
 
-print("############### USED OBJECTS #################")
-print(used_objects)
-print("#######################################################")
-print("Objets utilisés :", len(used_objects))
-print("############### UNUSED OBJECTS #################")
-print(unused_objects)
-print("#######################################################")
-print("Objets inutilisés :", len(unused_objects))
-print("Objets totaux :", len(objects))
 
-print("############## USED SERVICES GROUPS ##################")
-print(used_svc_groups)
-print("#######################################################")
-print("Groupes de services utilisés :", len(used_svc_groups))
-print("############## UNUSED SERVICE GROUPS ##################")
-print(unused_svc_groups)
-print("#######################################################")
-print("Groupes de services inutilisés :", len(unused_svc_groups))
-print("Groupes de services totaux :", len(svc_groups))
 
-print("############### USED SERVICES #################")
-print(used_services)
-print("#######################################################")
-print("Services utilisés :", len(used_services))
-print("############### UNUSED SERVICES #################")
-print(unused_services)
-print("#######################################################")
-print("Services inutilisés :", len(unused_services))
-print("################ SERVICES ###################")
-print(services)
-print("Services totaux :", len(services))
+# print("############## USED OBJECT GROUPS ##################")
+# print(used_obj_groups)
+# print("#######################################################")
+# print("Groupes d'objets utilisés :", len(used_obj_groups))
+# print("############## UNUSED OBJECT GROUPS ##################")
+# print(unused_obj_groups)
+# print("#######################################################")
+# print("Groupes d'objets inutilisés :", len(unused_obj_groups))
+# print("Groupes d'objets totaux :", len(net_groups))
+
+# print("############### USED OBJECTS #################")
+# print(used_objects)
+# print("#######################################################")
+# print("Objets utilisés :", len(used_objects))
+# print("############### UNUSED OBJECTS #################")
+# print(unused_objects)
+# print("#######################################################")
+# print("Objets inutilisés :", len(unused_objects))
+# print("Objets totaux :", len(objects))
+
+# print("############## USED SERVICES GROUPS ##################")
+# print(used_svc_groups)
+# print("#######################################################")
+# print("Groupes de services utilisés :", len(used_svc_groups))
+# print("############## UNUSED SERVICE GROUPS ##################")
+# print(unused_svc_groups)
+# print("#######################################################")
+# print("Groupes de services inutilisés :", len(unused_svc_groups))
+# print("Groupes de services totaux :", len(svc_groups))
+
+# print("############### USED SERVICES #################")
+# print(used_services)
+# print("#######################################################")
+# print("Services utilisés :", len(used_services))
+# print("############### UNUSED SERVICES #################")
+# print(unused_services)
+# print("#######################################################")
+# print("Services inutilisés :", len(unused_services))
+# print("################ SERVICES ###################")
+# print(services)
+# print("Services totaux :", len(services))
