@@ -399,13 +399,37 @@ def is_svc_used():
                     appendIfAbsent(svc,unused_services)
     return
 
-def create_object_api(obj):
+def get_token():
+    with open('../user.txt') as creds:
+        
+        line = creds.readline()
+        
+        user = line.split(',')[0]
+        pw = line.split(',')[1]
 
-    url = "https://1.2.3.4/api/fdm/v6/object/networks?expanded=true&limit=9000"
+        url = "https://x.x.x.x/api/fdm/v6/fdm/token"
+
+        payload = json.dumps({
+        "grant_type": "password",
+        "username": user,
+        "password": pw
+        })
+
+        headers = {
+        'Content-Type': 'application/json'
+        }
+        
+        request = requests.request("POST", url, headers=headers, data=payload, verify=False)
+        token = json.loads(request.text)['access_token']
+
+        return token
+
+def create_object_api(obj):
+    token = get_token()
+    url = "https://x.x.x.x/api/fdm/v6/object/networks?expanded=true&limit=9000"
 
     if "INLINE_" in obj['name']:
         name = obj['name'][7:]
-        print(name)
     else:
         name = obj['name']
 
@@ -425,12 +449,12 @@ def create_object_api(obj):
     "type": "networkobject"
     })
 
-    print(payload)
+    #print(payload)
     headers = {
-    'X-auth-access-token': '{{token}}',
+    'X-auth-access-token': token,
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'Authorization': 'Bearer {{token}}'
+    'Authorization': 'Bearer '+ token
     }
 
     response = requests.request("POST", url, headers=headers, data=payload, verify=False)
@@ -441,11 +465,56 @@ def create_object_api(obj):
 
 def create_object_group_api(grp):
 
-    payload = {
-    "name": "IPv4-Private-All-RFC1918",
-    "objects": [],
-    "type": "networkobjectgroup"
-    }
+    token = get_token()
+    url = "https://x.x.x.x/api/fdm/v6/object/networkgroups?expanded=true&limit=9000"
+
+    headers = {
+    'X-auth-access-token': token,
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'Authorization': 'Bearer '+ token
+    }        
+
+    name = "GRP_"+grp['name']
+    children = grp['children']
+
+    grp_obj = []
+
+    for child in children:
+        if "INLINE_" in child:
+            child_name = child[7:]
+        else:
+            child_name = child
+       
+        if len(re.findall(child, str(objects))) > 0:
+            type = "networkobject"
+        elif len(re.findall(child, str(net_groups))) > 0:
+            type = "networkobjectgroup"
+
+        url_objects = "https://x.x.x.x/api/fdm/v6/object/networks?expanded=true&limit=9000"
+
+        request = requests.request("GET", url_objects, headers=headers, data={}, verify=False)
+        items = json.loads(request.text)['items']
+        for item in items:
+            if "NET_"+child_name in item["name"]:
+                id = item["id"]
+            if "HOST_"+child_name in item["name"]:
+                id = item["id"]
+
+        dict = { "name" : child_name, "id" : id, "type" : type }
+
+        grp_obj.append(dict)
+
+    payload = json.dumps({
+        "name": name,
+        "objects": grp_obj,
+        "type": "networkobjectgroup"
+    })
+
+    response = requests.request("POST", url, headers=headers, data=payload, verify=False)
+
+    print(response.text)
+
     return
 
 find_objects()
@@ -456,6 +525,7 @@ find_service_groups()
 #is_grp_used()
 #is_obj_used()
 #is_svc_used()
+
 for object in objects:
     create_object_api(object)
     print(object)
@@ -464,10 +534,9 @@ for group in net_groups:
     create_object_group_api(group)
     print(group)
 
-
-
 # print("############## USED OBJECT GROUPS ##################")
 # print(used_obj_groups)
+# print(net_groups)
 # print("#######################################################")
 # print("Groupes d'objets utilisés :", len(used_obj_groups))
 # print("############## UNUSED OBJECT GROUPS ##################")
