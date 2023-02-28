@@ -28,7 +28,7 @@ def to_cidr(netmask):
 def to_netmask(cidr):
     host_bits = 32 - int(cidr)
     netmask = socket.inet_ntoa(struct.pack('!I', (1 << 32) - (1 << host_bits)))
-    return netmask
+    return str(netmask)
 
 def appendIfAbsent(obj,list):
     if list.count(obj) > 0:
@@ -51,6 +51,32 @@ def find_objects():
     with open('../show_run.txt') as file:
         for line in file:
 
+            parse = CiscoConfParse("../show_run.txt")
+
+            acls = parse.find_objects(r"^access-list .* extended (permit|deny)")
+            for acl in acls:
+
+                ip_addrs = re.findall(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', str(acl))
+                new_ips = []
+
+                for idx, ip in enumerate(ip_addrs):
+                    if "255" in ip:
+                        mask = to_cidr(ip)
+                        new_ips[idx-1]["mask"] = str(mask)
+                        new_ips[idx-1]["name"] = new_ips[idx-1]["name"]+"_"+str(mask)
+                        pass
+                    else:
+                        obj = {
+                            "name" : ip,
+                            "ipv4" : ip,
+                            "mask" : "32"
+                        }
+
+                    new_ips.append(obj)
+
+                for ip in new_ips:
+                    appendIfAbsent(ip,objects)                
+
             if line[:14] == 'object network':
                 nextLine = next(file, '').rstrip()
 
@@ -62,7 +88,7 @@ def find_objects():
                     ipv4 = nextLine[8:mask_start-1]
                     mask = to_cidr(nextLine[mask_start:])
 
-                    obj = {"name": name, "ipv4": ipv4, "mask" : mask}
+                    obj = {"name": name, "ipv4": ipv4, "mask" : str(mask)}
 
                     appendIfAbsent(obj,objects)
 
@@ -72,7 +98,7 @@ def find_objects():
                     ipv4 = nextLine[6:]
                     mask = "32"
 
-                    obj = {"name": name, "ipv4": ipv4, "mask" : mask}
+                    obj = {"name": name, "ipv4": ipv4, "mask" : str(mask)}
 
                     appendIfAbsent(obj,objects)
                                         
@@ -166,7 +192,7 @@ def find_object_groups():
                 mask = to_cidr(child[mask_start:])
                 name = "INLINE_"+ child[:mask_start]+"_"+str(mask)
 
-                obj = {"name": name, "ipv4": ipv4, "mask" : mask}
+                obj = {"name": name, "ipv4": ipv4, "mask" : str(mask)}
 
                 appendIfAbsent(obj,objects)
                 
@@ -338,6 +364,7 @@ def is_obj_used():
 
                 elif has_obj_nat.count(obj['name']) > 0:
                     appendIfAbsent(obj,used_objects)
+                    appendIfAbsent(obj,objects)
                 else:
                     appendIfAbsent(obj,unused_objects)
 
@@ -526,13 +553,13 @@ find_service_groups()
 #is_obj_used()
 #is_svc_used()
 
-for object in objects:
-    create_object_api(object)
-    print(object)
+# for object in objects:
+#     create_object_api(object)
+#     print(object)
 
-for group in net_groups:
-    create_object_group_api(group)
-    print(group)
+# for group in net_groups:
+#     create_object_group_api(group)
+#     print(group)
 
 # print("############## USED OBJECT GROUPS ##################")
 # print(used_obj_groups)
@@ -545,15 +572,16 @@ for group in net_groups:
 # print("Groupes d'objets inutilisés :", len(unused_obj_groups))
 # print("Groupes d'objets totaux :", len(net_groups))
 
-# print("############### USED OBJECTS #################")
-# print(used_objects)
-# print("#######################################################")
-# print("Objets utilisés :", len(used_objects))
-# print("############### UNUSED OBJECTS #################")
-# print(unused_objects)
-# print("#######################################################")
-# print("Objets inutilisés :", len(unused_objects))
-# print("Objets totaux :", len(objects))
+print("############### USED OBJECTS #################")
+print(used_objects)
+print("#######################################################")
+print("Objets utilisés :", len(used_objects))
+print("############### UNUSED OBJECTS #################")
+print(unused_objects)
+print("#######################################################")
+print("Objets inutilisés :", len(unused_objects))
+print("Objets totaux :", len(objects))
+print(objects)
 
 # print("############## USED SERVICES GROUPS ##################")
 # print(used_svc_groups)
