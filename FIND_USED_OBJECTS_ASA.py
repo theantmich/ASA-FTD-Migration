@@ -5,6 +5,9 @@ import struct
 import requests
 import json
 
+with open('../fmc_ip.txt') as ip:
+    fdm_ip = ip.readline().strip()
+
 objects = []
 net_groups = []
 services = []
@@ -434,7 +437,7 @@ def get_token():
         user = line.split(',')[0]
         pw = line.split(',')[1]
 
-        url = "https://x.x.x.x/api/fdm/v6/fdm/token"
+        url = "https://"+fdm_ip+"/api/fdm/v6/fdm/token"
 
         payload = json.dumps({
         "grant_type": "password",
@@ -453,7 +456,7 @@ def get_token():
 
 def create_object_api(obj):
     token = get_token()
-    url = "https://x.x.x.x/api/fdm/v6/object/networks?expanded=true&limit=9000"
+    url = "https://"+fdm_ip+"/api/fdm/v6/object/networks?expanded=true&limit=9000"
 
     if "INLINE_" in obj['name']:
         name = obj['name'][7:]
@@ -493,7 +496,7 @@ def create_object_api(obj):
 def create_object_group_api(grp):
 
     token = get_token()
-    url = "https://x.x.x.x/api/fdm/v6/object/networkgroups?expanded=true&limit=9000"
+    url = "https://"+fdm_ip+"/api/fdm/v6/object/networkgroups?expanded=true&limit=9000"
 
     headers = {
     'X-auth-access-token': token,
@@ -518,7 +521,7 @@ def create_object_group_api(grp):
         elif len(re.findall(child, str(net_groups))) > 0:
             type = "networkobjectgroup"
 
-        url_objects = "https://x.x.x.x/api/fdm/v6/object/networks?expanded=true&limit=9000"
+        url_objects = "https://"+fdm_ip+"/api/fdm/v6/object/networks?expanded=true&limit=9000"
 
         request = requests.request("GET", url_objects, headers=headers, data={}, verify=False)
         items = json.loads(request.text)['items']
@@ -553,13 +556,13 @@ find_service_groups()
 #is_obj_used()
 #is_svc_used()
 
-# for object in objects:
-#     create_object_api(object)
-#     print(object)
+for object in objects:
+    create_object_api(object)
+    print(object)
 
-# for group in net_groups:
-#     create_object_group_api(group)
-#     print(group)
+for group in net_groups:
+    create_object_group_api(group)
+    print(group)
 
 # print("############## USED OBJECT GROUPS ##################")
 # print(used_obj_groups)
